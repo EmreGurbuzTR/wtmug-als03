@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Hava Durumu · PWA</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon-192.svg">
+<style>
+  :root{
+    --bg:#0b1220; --surface:#151d2f; --surface-2:#1e2839; --border:#2a3448;
+    --text:#e7ecf5; --muted:#8f9bb3; --accent:#38bdf8;
+    --warm:#fb923c; --cold:#60a5fa; --ok:#4ade80; --danger:#f87171;
+    --radius:16px;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{
+    margin:0; background:var(--bg); color:var(--text); min-height:100dvh;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    font-size:15px; padding-bottom:calc(24px + env(safe-area-inset-bottom));
+  }
+  header{
+    padding:calc(16px + env(safe-area-inset-top)) 16px 12px;
+    background:linear-gradient(180deg,#16213a,#0b1220);
+    border-bottom:1px solid var(--border);
+    position:sticky; top:0; z-index:20;
+  }
+  header h1{ margin:0; font-size:17px; font-weight:700; display:flex; align-items:center; gap:8px; }
+  header .sub{ color:var(--muted); font-size:12px; margin-top:3px; }
+  main{ padding:14px 16px 0; }
+
+  .search{
+    display:flex; gap:8px; margin-bottom:14px;
+  }
+  .search input{
+    flex:1; background:var(--surface); border:1px solid var(--border);
+    color:var(--text); padding:12px 14px; border-radius:12px; font-size:15px;
+  }
+  .search input::placeholder{ color:#5a6784; }
+  .search button{
+    background:var(--accent); color:#04202c; border:0; padding:0 18px;
+    border-radius:12px; font-weight:700; font-size:14px; cursor:pointer;
+  }
+  .search button:active{ transform:scale(.97); }
+
+  .geo-btn{
+    width:100%; background:transparent; color:var(--accent); border:1px dashed var(--accent);
+    padding:10px; border-radius:12px; font-size:13px; font-weight:600;
+    margin-bottom:14px; cursor:pointer;
+  }
+
+  .card{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius); padding:16px; margin-bottom:12px;
+  }
+  .card h2{ margin:0 0 4px; font-size:16px; font-weight:700; }
+  .card .meta{ color:var(--muted); font-size:12px; margin-bottom:14px; }
+
+  .current{ display:flex; align-items:center; gap:16px; }
+  .current .icon{ font-size:56px; line-height:1; }
+  .current .temp{ font-size:44px; font-weight:800; letter-spacing:-1.5px; }
+  .current .desc{ color:var(--muted); font-size:13px; margin-top:2px; }
+
+  .stats{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:16px; }
+  .stat{ background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; }
+  .stat .k{ color:var(--muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+  .stat .v{ font-size:16px; font-weight:700; margin-top:3px; }
+
+  .forecast{ display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; margin-top:6px; }
+  .forecast::-webkit-scrollbar{ display:none; }
+  .day{
+    flex:0 0 76px; background:var(--surface-2); border:1px solid var(--border);
+    border-radius:12px; padding:10px 6px; text-align:center;
+  }
+  .day .name{ font-size:11px; color:var(--muted); font-weight:600; }
+  .day .ico{ font-size:24px; margin:6px 0; }
+  .day .hi{ font-size:14px; font-weight:700; }
+  .day .lo{ font-size:12px; color:var(--muted); }
+
+  .state{
+    text-align:center; padding:30px 16px; color:var(--muted);
+  }
+  .state .big{ font-size:40px; margin-bottom:8px; }
+  .state .msg{ font-size:14px; }
+  .spinner{
+    width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--accent);
+    border-radius:50%; animation:spin .9s linear infinite; margin:0 auto 12px;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .error{ color:var(--danger); }
+  .hint{
+    font-size:12px; color:var(--muted); line-height:1.5;
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:12px; margin-top:12px;
+  }
+  .hint code{ background:var(--surface-2); padding:1px 6px; border-radius:5px; font-size:11px; }
+
+  .net{
+    position:fixed; bottom:calc(12px + env(safe-area-inset-bottom)); left:50%;
+    transform:translateX(-50%); background:var(--danger); color:#2a0505;
+    padding:8px 16px; border-radius:999px; font-size:12px; font-weight:700;
+    display:none; z-index:50;
+  }
+  .net.show{ display:block; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌤️ Hava Durumu <span style="font-size:10px; background:var(--surface-2); color:var(--accent); padding:2px 7px; border-radius:999px; border:1px solid var(--border); font-weight:600;">Open-Meteo</span></h1>
+  <div class="sub">Ücretsiz API · API key gerekmez · PWA</div>
+</header>
+
+<main>
+  <form class="search" id="searchForm">
+    <input type="text" id="cityInput" placeholder="Şehir ara: İstanbul, Ankara, İzmir…" autocomplete="off">
+    <button type="submit">Ara</button>
+  </form>
+
+  <button class="geo-btn" id="geoBtn">📍 Konumumu kullan</button>
+
+  <div id="result"></div>
+
+  <div class="hint">
+    <b>💡 Bu uygulama ne yapıyor?</b><br>
+    1️⃣ <code>geocoding-api.open-meteo.com</code> → şehir adını enlem/boylam'a çevirir<br>
+    2️⃣ <code>api.open-meteo.com</code> → koordinata göre hava tahmini getirir<br>
+    3️⃣ Veri <code>localStorage</code>'a yazılır → çevrimdışıyken son sonuç görünür
+  </div>
+</main>
+
+<div class="net" id="netBanner">📡 Çevrimdışısın — son veriler gösteriliyor</div>
+
+<script>
+/* ============================================================
+   KAVRAM: Free API + fetch() + JSON + localStorage
+   ============================================================ */
+
+// ---------- 1) SABİTLER ----------
+const GEO_URL   = 'https://geocoding-api.open-meteo.com/v1/search';
+const WX_URL    = 'https://api.open-meteo.com/v1/forecast';
+const STORAGE_KEY = 'hava-durumu-son-sonuc';
+
+// WMO Weather Interpretation Codes → emoji + Türkçe açıklama
+// Kaynak: https://open-meteo.com/en/docs (WMO Weather interpretation codes)
+const WMO = {
+  0:  ['☀️',  'Açık'],
+  1:  ['🌤️', 'Az bulutlu'],
+  2:  ['⛅',  'Parçalı bulutlu'],
+  3:  ['☁️',  'Kapalı'],
+  45: ['🌫️', 'Sisli'],
+  48: ['🌫️', 'Kırağılı sis'],
+  51: ['🌦️', 'Hafif çisenti'],
+  53: ['🌦️', 'Çisenti'],
+  55: ['🌧️', 'Yoğun çisenti'],
+  61: ['🌧️', 'Hafif yağmur'],
+  63: ['🌧️', 'Yağmurlu'],
+  65: ['🌧️', 'Şiddetli yağmur'],
+  71: ['🌨️', 'Hafif kar'],
+  73: ['🌨️', 'Kar'],
+  75: ['❄️',  'Yoğun kar'],
+  77: ['🌨️', 'Kar taneleri'],
+  80: ['🌦️', 'Sağanak'],
+  81: ['🌧️', 'Şiddetli sağanak'],
+  82: ['⛈️',  'Çok şiddetli sağanak'],
+  85: ['🌨️', 'Kar sağanağı'],
+  86: ['❄️',  'Yoğun kar sağanağı'],
+  95: ['⛈️',  'Gök gürültülü fırtına'],
+  96: ['⛈️',  'Dolulu fırtına'],
+  99: ['⛈️',  'Şiddetli dolulu fırtına']
+};
+
+// ---------- 2) YARDIMCILAR ----------
+const $ = sel => document.querySelector(sel);
+
+function wmoInfo(code) {
+  return WMO[code] || ['❔', 'Bilinmiyor'];
+}
+
+function gunAdi(iso, index) {
+  if (index === 0) return 'Bugün';
+  if (index === 1) return 'Yarın';
+  const d = new Date(iso);
+  return ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'][d.getDay()];
+}
+
+function setLoading(msg = 'Yükleniyor…') {
+  $('#result').innerHTML = `
+    <div class="state">
+      <div class="spinner"></div>
+      <div class="msg">${msg}</div>
+    </div>`;
+}
+
+function setError(msg) {
+  $('#result').innerHTML = `
+    <div class="state error">
+      <div class="big">😕</div>
+      <div class="msg">${msg}</div>
+    </div>`;
+}
+
+// ---------- 3) API ÇAĞRILARI ----------
+/**
+ * Şehir adından koordinat bulur.
+ * Örnek istek: /v1/search?name=Ankara&count=5&language=tr&format=json
+ */
+async function sehirAra(ad) {
+  const url = new URL(GEO_URL);
+  url.searchParams.set('name', ad);
+  url.searchParams.set('count', '1');
+  url.searchParams.set('language', 'tr');
+  url.searchParams.set('format', 'json');
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Geocoding API hatası: ' + res.status);
+
+  const data = await res.json();
+  if (!data.results || !data.results.length) {
+    throw new Error(`"${ad}" için sonuç bulunamadı.`);
+  }
+  const r = data.results[0];
+  return {
+    name: r.name,
+    country: r.country || '',
+    admin1: r.admin1 || '',
+    lat: r.latitude,
+    lon: r.longitude
+  };
+}
+
+/**
+ * Koordinata göre güncel + 7 günlük tahmin getirir.
+ */
+async function havaGetir(lat, lon) {
+  const url = new URL(WX_URL);
+  url.searchParams.set('latitude',  lat);
+  url.searchParams.set('longitude', lon);
+  url.searchParams.set('current',
+    'temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m');
+  url.searchParams.set('daily',
+    'weather_code,temperature_2m_max,temperature_2m_min');
+  url.searchParams.set('timezone', 'auto');
+  url.searchParams.set('forecast_days', '7');
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Weather API hatası: ' + res.status);
+  return res.json();
+}
+
+// ---------- 4) RENDER ----------
+function render(yer, wx) {
+  const [emoji, aciklama] = wmoInfo(wx.current.weather_code);
+
+  const yerAdi = yer.admin1 && yer.admin1 !== yer.name
+    ? `${yer.name}, ${yer.admin1}`
+    : yer.name;
+  const ulke = yer.country ? ` · ${yer.country}` : '';
+
+  // 7 günlük kartlar
+  const gunler = wx.daily.time.map((iso, i) => {
+    const [e] = wmoInfo(wx.daily.weather_code[i]);
+    const hi = Math.round(wx.daily.temperature_2m_max[i]);
+    const lo = Math.round(wx.daily.temperature_2m_min[i]);
+    return `
+      <div class="day">
+        <div class="name">${gunAdi(iso, i)}</div>
+        <div class="ico">${e}</div>
+        <div class="hi">${hi}°</div>
+        <div class="lo">${lo}°</div>
+      </div>`;
+  }).join('');
+
+  $('#result').innerHTML = `
+    <div class="card">
+      <h2>${yerAdi}</h2>
+      <div class="meta">${ulke.replace(/^ · /, '')} · ${yer.lat.toFixed(3)}, ${yer.lon.toFixed(3)}</div>
+
+      <div class="current">
+        <div class="icon">${emoji}</div>
+        <div>
+          <div class="temp">${Math.round(wx.current.temperature_2m)}°C</div>
+          <div class="desc">${aciklama} · Hissedilen ${Math.round(wx.current.apparent_temperature)}°C</div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="k">Nem</div><div class="v">${wx.current.relative_humidity_2m}%</div></div>
+        <div class="stat"><div class="k">Rüzgâr</div><div class="v">${wx.current.wind_speed_10m} km/s</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>7 Günlük Tahmin</h2>
+      <div class="meta">Open-Meteo · ${new Date(wx.current.time).toLocaleString('tr-TR')}</div>
+      <div class="forecast">${gunler}</div>
+    </div>
+  `;
+}
+
+// ---------- 5) ANA AKIŞ ----------
+async function ara(konum) {
+  setLoading(konum.name ? `${konum.name} için veri çekiliyor…` : 'Konum aranıyor…');
+  try {
+    let yer;
+    if (konum.lat != null) {
+      yer = konum; // zaten koordinat var
+    } else {
+      yer = await sehirAra(konum.name);
+    }
+    const wx = await havaGetir(yer.lat, yer.lon);
+    render(yer, wx);
+
+    // Son sonucu kaydet → çevrimdışıyken göster
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ yer, wx, ts: Date.now() }));
+  } catch (err) {
+    console.error(err);
+    setError(err.message || 'Bilinmeyen hata. İnternet bağlantını kontrol et.');
+  }
+}
+
+// ---------- 6) OLAYLAR ----------
+$('#searchForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const ad = $('#cityInput').value.trim();
+  if (!ad) return;
+  ara({ name: ad });
+});
+
+$('#geoBtn').addEventListener('click', () => {
+  if (!navigator.geolocation) {
+    setError('Tarayıcın Geolocation API desteklemiyor.');
+    return;
+  }
+  setLoading('Konum alınıyor…');
+  navigator.geolocation.getCurrentPosition(
+    (pos) => ara({
+      name: 'Konumum',
+      lat: pos.coords.latitude,
+      lon: pos.coords.longitude,
+      admin1: '',
+      country: ''
+    }),
+    (err) => setError('Konum alınamadı: ' + err.message),
+    { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }
+  );
+});
+
+// ---------- 7) ÇEVRİMDIŞI DESTEK ----------
+const netBanner = $('#netBanner');
+function onlineDurum() {
+  netBanner.classList.toggle('show', !navigator.onLine);
+}
+addEventListener('online',  onlineDurum);
+addEventListener('offline', onlineDurum);
+onlineDurum();
+
+// Sayfa açılırken: son sonuç varsa göster
+(function sonSonucuYukle() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) {
+    setError('Başlamak için bir şehir ara veya konumunu kullan.');
+    return;
+  }
+  try {
+    const { yer, wx, ts } = JSON.parse(raw);
+    render(yer, wx);
+    if (!navigator.onLine) {
+      // banner zaten görünür, üstüne "önbellekten" notu ekleyelim
+      const meta = document.querySelector('.card .meta');
+      if (meta) meta.textContent += ' · önbellekten';
+    }
+  } catch (e) {
+    setError('Kayıtlı veri okunamadı. Yeniden arama yap.');
+  }
+})();
+
+// ---------- 8) SERVICE WORKER ----------
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('SW kayıtlı:', reg.scope))
+      .catch(err => console.warn('SW kaydı başarısız:', err));
+  });
+}
+</script>
+</body>
+</html>
